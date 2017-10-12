@@ -1,13 +1,28 @@
 #include "ofxArtNode.h"
 
-void ofxArtNode::setup() {
+void ofxArtNode::setup(string host) {
+
+	config->ip[0] = NETID0;
+	config->ip[1] = 255;
+	config->ip[2] = 255;
+	config->ip[3] = 255;
+
+	config->mask[0] = 255;
+	config->mask[1] = 0;
+	config->mask[2] = 0;
+	config->mask[3] = 0;
+
+	config->udpPort = DefaultPort;
+
 	udp.Create();
 	udp.SetEnableBroadcast(true);
 	udp.SetReuseAddress(true);
 	udp.SetNonBlocking(true);
 	udp.SetSendBufferSize(4096);
 	udp.SetTimeoutSend(1);
-	udp.ConnectMcast("2.255.255.255", 0x1936);
+	udp.ConnectMcast((char*)getBroadcastIp().c_str(), config->udpPort);
+
+	ofLog() << "ArtNode setup on: " << getBroadcastIp();
 }
 
 void ofxArtNode::update() {
@@ -22,6 +37,28 @@ void ofxArtNode::update() {
 			nodes[addr] = *reply;
 		}
 	}
+}
+
+int ofxArtNode::getNumNodes() {
+	return nodes.size();
+}
+
+ArtPollReply * ofxArtNode::getNode(int index) {
+	if (index > 0 && index < nodes.size()) {
+		auto it = nodes.begin();
+		advance(it, index);
+		return &it->second;
+	}
+	return NULL;
+}
+
+string ofxArtNode::getNodeIp(int index) {
+	if (index > 0 && index < nodes.size()) {
+		auto it = nodes.begin();
+		advance(it, index);
+		return it->first;
+	}
+	return string();
 }
 
 void ofxArtNode::sendPoll() {
@@ -44,7 +81,7 @@ ofxArtDmx * ofxArtNode::createArtDmx(int net, int sub, int universe) {
 }
 
 void ofxArtNode::sendMultiCast(char * data, int length) {
-	udp.Connect(getBroadcastIp().c_str(), 0x1936);
+	udp.Connect(getBroadcastIp().c_str(), config->udpPort);
 	udp.SendAll(data, length);
 }
 
@@ -60,7 +97,7 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe, char * data, int
 		if (reply.NetSwitch == net && reply.SubSwitch == subnet) {
 			for (int i=0; i<reply.NumPortsLo; i++) {
 				if (reply.PortTypes[i] & PortTypeOutput && reply.getPortProtocol(i) == PortTypeDmx && reply.SwOut[i] == universe) {
-					udp.Connect(addr.c_str(), 0x1936);
+					udp.Connect(addr.c_str(), reply.BoxAddr.Port != 0 ? reply.BoxAddr.Port : config->udpPort);
 					udp.SendAll(data, length);
 					ret = true;
 				}
@@ -83,9 +120,12 @@ bool ofxArtNode::readyFps(float frameRate) {
 	return false;
 }
 
+void ofxArtNode::doneFps() {
+	lastFrameTime = ofGetElapsedTimeMillis();
+}
+
 string ofxArtNode::getBroadcastIp() {
-	char sz[16];
-	uint32_t bc = broadcastIP();
-	sprintf(sz, "%d.%d.%d.%d", bc >> 24, (bc >> 16) & 0xF, (bc >> 8) & 0xF, bc & 0xF);
-	return sz;
+	in_addr bc;
+	bc.S_un.S_addr = broadcastIP();
+	return inet_ntoa(bc);
 }

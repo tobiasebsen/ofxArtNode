@@ -7,9 +7,13 @@
 
 class ofxArtNode : public ArtNode {
 public:
-	void setup();
+	void setup(string host = "2.255.255.255");
 
 	void update();
+
+	int getNumNodes();
+	ArtPollReply * getNode(int index);
+	string getNodeIp(int index);
 
 	void sendPoll();
 	void sendDmx(ArtDmx * dmx);
@@ -23,6 +27,7 @@ public:
 	bool sendUniCast(int net, int subnet, int universe);
 
 	bool readyFps(float frameRate);
+	void doneFps();
 
 protected:
 	ofxUDPManager udp;
