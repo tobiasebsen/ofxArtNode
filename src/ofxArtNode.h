@@ -9,6 +9,7 @@ class ofxArtNode : public ArtNode {
 public:
     static map<string,string> getInterfaces();
     static string getInterfaceAddr(string name);
+	static string getInterfaceAddr(int ifindex);
 
     void setup(string host = "2.255.255.255");
 

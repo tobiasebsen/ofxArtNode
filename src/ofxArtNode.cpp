@@ -1,6 +1,8 @@
 #include "ofxArtNode.h"
 
-#ifndef WIN32
+#ifdef WIN32
+#include <iphlpapi.h>
+#else
 #include <ifaddrs.h>
 #endif
 
@@ -39,7 +41,29 @@ void ofxArtNode::setup(string host) {
 
 map<string,string> ofxArtNode::getInterfaces() {
     map<string,string> interfaces;
-#ifndef WIN32
+#ifdef WIN32
+	PIP_ADAPTER_INFO pAdapterInfo;
+	ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
+	pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+
+	if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
+		free(pAdapterInfo);
+		pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+	}
+
+	DWORD dwRetVal = 0;
+	if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR) {
+		PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
+		while (pAdapter) {
+			string name = pAdapter->AdapterName;
+			string host = pAdapter->IpAddressList.IpAddress.String;
+			interfaces[name] = host;
+			pAdapter = pAdapter->Next;
+		}
+	}
+	
+	free(pAdapterInfo);
+#else
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) == -1) {
         return;
@@ -66,6 +90,17 @@ string ofxArtNode::getInterfaceAddr(string name) {
     map<string,string> interfaces = getInterfaces();
     auto it = interfaces.find(name);
     return it == interfaces.end() ? "2.255.255.255" : it->second;
+}
+
+string ofxArtNode::getInterfaceAddr(int ifindex) {
+	map<string,string> interfaces = getInterfaces();
+	if (ifindex < interfaces.size()) {
+		auto it = interfaces.begin();
+		advance(it, ifindex);
+		return it->second;
+	}
+	else
+		return "";
 }
 
 void ofxArtNode::update() {
@@ -160,12 +195,17 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe) {
 }
 
 bool ofxArtNode::sendUniCast(string addr, unsigned short udpPort, char * data, int length) {
-    udp.Connect(addr.c_str(), udpPort);
-    udp.SendAll(data, length);
+    if (!udp.Connect(addr.c_str(), udpPort))
+		return false;
+
+    if (udp.SendAll(data, length) < length)
+		return false;
+
+	return true;
 }
 
 bool ofxArtNode::sendUniCast(string addr, unsigned short udpPort) {
-    sendUniCast(addr, udpPort, (char*)getBufferData(), getPacketSize());
+    return sendUniCast(addr, udpPort, (char*)getBufferData(), getPacketSize());
 }
 
 bool ofxArtNode::readyFps(float frameRate) {
