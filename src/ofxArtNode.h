@@ -7,12 +7,16 @@
 
 class ofxArtNode : public ArtNode {
 public:
-	void setup(string host = "2.255.255.255");
+    static map<string,string> getInterfaces();
+    static string getInterfaceAddr(string name);
+
+    void setup(string host = "2.255.255.255");
 
 	void update();
 
 	int getNumNodes();
 	ArtPollReply * getNode(int index);
+    ArtPollReply * getNode(string addr);
 	string getNodeIp(int index);
 
 	void sendPoll();
@@ -25,9 +29,13 @@ public:
 	void sendMultiCast();
 	bool sendUniCast(int net, int subnet, int universe, char * data, int length);
 	bool sendUniCast(int net, int subnet, int universe);
+    bool sendUniCast(string addr, unsigned short udpPort, char * data, int length);
+    bool sendUniCast(string addr, unsigned short udpPort = 0x1936);
 
 	bool readyFps(float frameRate);
 	void doneFps();
+    
+    ofEvent<string> pollReplyReceived;
 
 protected:
 	ofxUDPManager udp;

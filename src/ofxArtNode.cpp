@@ -1,11 +1,23 @@
 #include "ofxArtNode.h"
 
-void ofxArtNode::setup(string host) {
+#ifndef WIN32
+#include <ifaddrs.h>
+#endif
 
-	config->ip[0] = NETID0;
-	config->ip[1] = 255;
-	config->ip[2] = 255;
-	config->ip[3] = 255;
+void ofxArtNode::setup(string host) {
+    
+    vector<string> addr = ofSplitString(host, ".");
+    if (addr.size() == 4) {
+        for (int i=0; i<4; i++) {
+            config->ip[i] = ofToInt(addr[i]);
+        }
+    }
+    else {
+        config->ip[0] = NETID0;
+        config->ip[1] = 255;
+        config->ip[2] = 255;
+        config->ip[3] = 255;
+    }
 
 	config->mask[0] = 255;
 	config->mask[1] = 0;
@@ -25,6 +37,37 @@ void ofxArtNode::setup(string host) {
 	ofLog() << "ArtNode setup on: " << getBroadcastIp();
 }
 
+map<string,string> ofxArtNode::getInterfaces() {
+    map<string,string> interfaces;
+#ifndef WIN32
+    struct ifaddrs *ifaddr, *ifa;
+    if (getifaddrs(&ifaddr) == -1) {
+        return;
+    }
+    
+    ifa = ifaddr;
+    while (ifa->ifa_next != NULL) {
+        
+        if (ifa->ifa_addr->sa_family == AF_INET) {
+            char host[NI_MAXHOST];
+            getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, sizeof(host), NULL, 0, NI_NUMERICHOST);
+            
+            interfaces[ifa->ifa_name] = host;
+        }
+
+        ifa = ifa->ifa_next;
+    }
+    freeifaddrs(ifaddr);
+#endif
+    return interfaces;
+}
+
+string ofxArtNode::getInterfaceAddr(string name) {
+    map<string,string> interfaces = getInterfaces();
+    auto it = interfaces.find(name);
+    return it == interfaces.end() ? "2.255.255.255" : it->second;
+}
+
 void ofxArtNode::update() {
 	int nbytes = udp.Receive((char*)this->getBufferData(), this->getBufferSize());
 	if (nbytes > sizeof(ArtHeader) && isPacketValid()) {
@@ -35,6 +78,7 @@ void ofxArtNode::update() {
 			int port;
 			udp.GetRemoteAddr(addr, port);
 			nodes[addr] = *reply;
+            ofNotifyEvent(pollReplyReceived, addr, this);
 		}
 	}
 }
@@ -52,6 +96,11 @@ ArtPollReply * ofxArtNode::getNode(int index) {
 	return NULL;
 }
 
+ArtPollReply * ofxArtNode::getNode(string addr) {
+    auto it = nodes.find(addr);
+    return it != nodes.end() ? &it->second : NULL;
+}
+
 string ofxArtNode::getNodeIp(int index) {
 	if (index > 0 && index < nodes.size()) {
 		auto it = nodes.begin();
@@ -67,8 +116,8 @@ void ofxArtNode::sendPoll() {
 }
 
 void ofxArtNode::sendDmx(ArtDmx * dmx) {
-	if (!sendUniCast(dmx->getNet(), dmx->getSub(), dmx->getUni(), (char*)dmx, sizeof(ArtDmx)))
-		sendMultiCast((char*)dmx, sizeof(ArtDmx));
+    bool nodeFound = sendUniCast(dmx->getNet(), dmx->getSub(), dmx->getUni(), (char*)dmx, sizeof(ArtDmx));
+    //sendMultiCast((char*)dmx, sizeof(ArtDmx));
 }
 
 void ofxArtNode::sendSync() {
@@ -97,8 +146,7 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe, char * data, int
 		if (reply.NetSwitch == net && reply.SubSwitch == subnet) {
 			for (int i=0; i<reply.NumPortsLo; i++) {
 				if (reply.PortTypes[i] & PortTypeOutput && reply.getPortProtocol(i) == PortTypeDmx && reply.SwOut[i] == universe) {
-					udp.Connect(addr.c_str(), reply.BoxAddr.Port != 0 ? reply.BoxAddr.Port : config->udpPort);
-					udp.SendAll(data, length);
+					sendUniCast(addr.c_str(), reply.BoxAddr.Port != 0 ? reply.BoxAddr.Port : config->udpPort, data, length);
 					ret = true;
 				}
 			}
@@ -109,6 +157,15 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe, char * data, int
 
 bool ofxArtNode::sendUniCast(int net, int subnet, int universe) {
 	return sendUniCast(net, subnet, universe, (char*)getBufferData(), getPacketSize());
+}
+
+bool ofxArtNode::sendUniCast(string addr, unsigned short udpPort, char * data, int length) {
+    udp.Connect(addr.c_str(), udpPort);
+    udp.SendAll(data, length);
+}
+
+bool ofxArtNode::sendUniCast(string addr, unsigned short udpPort) {
+    sendUniCast(addr, udpPort, (char*)getBufferData(), getPacketSize());
 }
 
 bool ofxArtNode::readyFps(float frameRate) {
@@ -126,6 +183,10 @@ void ofxArtNode::doneFps() {
 
 string ofxArtNode::getBroadcastIp() {
 	in_addr bc;
+#ifdef WIN32
 	bc.S_un.S_addr = broadcastIP();
+#else
+    bc.s_addr = broadcastIP();
+#endif
 	return inet_ntoa(bc);
 }
