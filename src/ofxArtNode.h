@@ -24,7 +24,7 @@ public:
 	void sendDmx(ArtDmx * dmx);
 	void sendSync();
 
-	ofxArtDmx * createArtDmx(int net, int sub, int universe);
+	ofxArtDmx * createArtDmx(int net = 0, int sub = 0, int universe = 0);
 
 	void sendMultiCast(char * data, int length);
 	void sendMultiCast();

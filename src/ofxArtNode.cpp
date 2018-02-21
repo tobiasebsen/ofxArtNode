@@ -151,7 +151,7 @@ void ofxArtNode::sendPoll() {
 }
 
 void ofxArtNode::sendDmx(ArtDmx * dmx) {
-    bool nodeFound = sendUniCast(dmx->getNet(), dmx->getSub(), dmx->getUni(), (char*)dmx, sizeof(ArtDmx));
+    bool nodeFound = sendUniCast(dmx->getNet(), dmx->getSub(), dmx->getUni(), (char*)dmx, dmx->getSize());
     //sendMultiCast((char*)dmx, sizeof(ArtDmx));
 }
 
