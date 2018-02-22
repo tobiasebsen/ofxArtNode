@@ -35,6 +35,8 @@ void ofxArtNode::setup(string host) {
 	udp.SetSendBufferSize(4096);
 	udp.SetTimeoutSend(1);
 	udp.ConnectMcast((char*)getBroadcastIp().c_str(), config->udpPort);
+    
+    pollInterval = 10000;
 
 	ofLog() << "ArtNode setup on: " << getBroadcastIp();
 }
@@ -104,6 +106,7 @@ string ofxArtNode::getInterfaceAddr(int ifindex) {
 }
 
 void ofxArtNode::update() {
+    unsigned long long now = ofGetSystemTime();
 	int nbytes = udp.Receive((char*)this->getBufferData(), this->getBufferSize());
 	if (nbytes > sizeof(ArtHeader) && isPacketValid()) {
 		uint16_t opCode = getOpCode();
@@ -112,10 +115,26 @@ void ofxArtNode::update() {
 			string addr;
 			int port;
 			udp.GetRemoteAddr(addr, port);
-			nodes[addr] = *reply;
-            ofNotifyEvent(pollReplyReceived, addr, this);
+            NodeEntry ne;
+            ne.address = addr;
+            ne.timeStamp = now;
+            ne.pollReply = *reply;
+			nodes[addr] = ne;
+            ofNotifyEvent(pollReplyReceived, ne, this);
 		}
 	}
+    for (auto it=nodes.begin(); it!=nodes.end();) {
+        NodeEntry & node = it->second;
+        if (node.timeStamp - lastPollTime > 3000) {
+            ofNotifyEvent(pollReplyErased, node, this);
+            nodes.erase(it);
+        } else {
+            it++;
+        }
+    }
+    if (now - lastPollTime > pollInterval) {
+        sendPoll();
+    }
 }
 
 int ofxArtNode::getNumNodes() {
@@ -126,14 +145,14 @@ ArtPollReply * ofxArtNode::getNode(int index) {
 	if (index > 0 && index < nodes.size()) {
 		auto it = nodes.begin();
 		advance(it, index);
-		return &it->second;
+		return &it->second.pollReply;
 	}
 	return NULL;
 }
 
 ArtPollReply * ofxArtNode::getNode(string addr) {
     auto it = nodes.find(addr);
-    return it != nodes.end() ? &it->second : NULL;
+    return it != nodes.end() ? &it->second.pollReply : NULL;
 }
 
 string ofxArtNode::getNodeIp(int index) {
@@ -148,6 +167,7 @@ string ofxArtNode::getNodeIp(int index) {
 void ofxArtNode::sendPoll() {
 	createPoll();
 	sendMultiCast();
+    lastPollTime = ofGetSystemTime();
 }
 
 void ofxArtNode::sendDmx(ArtDmx * dmx) {
@@ -177,7 +197,7 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe, char * data, int
 	bool ret = false;
 	for (auto & pair : nodes) {
 		string addr = pair.first;
-		ArtPollReply & reply = pair.second;
+		ArtPollReply & reply = pair.second.pollReply;
 		if (reply.NetSwitch == net && reply.SubSwitch == subnet) {
 			for (int i=0; i<reply.NumPortsLo; i++) {
 				if (reply.PortTypes[i] & PortTypeOutput && reply.getPortProtocol(i) == PortTypeDmx && reply.SwOut[i] == universe) {

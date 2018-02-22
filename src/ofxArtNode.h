@@ -36,12 +36,22 @@ public:
 	bool readyFps(float frameRate);
 	void doneFps();
     
-    ofEvent<string> pollReplyReceived;
+    typedef struct {
+        string address;
+        unsigned long long timeStamp;
+        ArtPollReply pollReply;
+    } NodeEntry;
+
+    ofEvent<NodeEntry> pollReplyReceived;
+    ofEvent<NodeEntry> pollReplyErased;
 
 protected:
 	ofxUDPManager udp;
-	map<string,ArtPollReply> nodes;
+    
+	map<string,NodeEntry> nodes;
 	uint64_t lastFrameTime;
+    uint64_t lastPollTime;
+    uint32_t pollInterval;
 
 	string getBroadcastIp();
 };
