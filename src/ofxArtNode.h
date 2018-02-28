@@ -16,6 +16,7 @@ public:
 	void update();
 
 	int getNumNodes();
+    int getNumRelpies();
 	ArtPollReply * getNode(int index);
     ArtPollReply * getNode(string addr);
 	string getNodeIp(int index);

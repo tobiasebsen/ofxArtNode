@@ -125,9 +125,11 @@ void ofxArtNode::update() {
 	}
     for (auto it=nodes.begin(); it!=nodes.end();) {
         NodeEntry & node = it->second;
-        if (node.timeStamp - lastPollTime > 3000) {
+        int age = node.timeStamp - lastPollTime;
+        if (age > 4000) {
             ofNotifyEvent(pollReplyErased, node, this);
-            nodes.erase(it);
+            //it = nodes.erase(it);
+            it++;
         } else {
             it++;
         }
@@ -139,6 +141,16 @@ void ofxArtNode::update() {
 
 int ofxArtNode::getNumNodes() {
 	return nodes.size();
+}
+
+int ofxArtNode::getNumRelpies() {
+    int nreply = 0;
+    for (auto & ne : nodes) {
+        if (ne.second.timeStamp > lastPollTime) {
+            nreply++;
+        }
+    }
+    return nreply;
 }
 
 ArtPollReply * ofxArtNode::getNode(int index) {
