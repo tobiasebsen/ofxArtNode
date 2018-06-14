@@ -37,7 +37,7 @@ public:
 	bool readyFps(float frameRate);
 	void doneFps();
     
-    typedef struct {
+    typedef struct _NodeEntry {
         string address;
         unsigned long long timeStamp;
         ArtPollReply pollReply;
