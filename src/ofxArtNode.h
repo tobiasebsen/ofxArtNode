@@ -44,7 +44,8 @@ public:
     } NodeEntry;
 
     ofEvent<NodeEntry> pollReplyReceived;
-    ofEvent<NodeEntry> pollReplyErased;
+    ofEvent<NodeEntry> nodeAdded;
+    ofEvent<NodeEntry> nodeErased;
 
 protected:
 	ofxUDPManager udp;
@@ -53,6 +54,7 @@ protected:
 	uint64_t lastFrameTime;
     uint64_t lastPollTime;
     uint32_t pollInterval;
+    uint64_t pollFrameNum;
 
 	string getBroadcastIp();
 };

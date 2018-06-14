@@ -115,21 +115,25 @@ void ofxArtNode::update() {
 			string addr;
 			int port;
 			udp.GetRemoteAddr(addr, port);
+            
             NodeEntry ne;
             ne.address = addr;
             ne.timeStamp = now;
             ne.pollReply = *reply;
 			nodes[addr] = ne;
             ofNotifyEvent(pollReplyReceived, ne, this);
-		}
+
+            if (nodes.find(addr) == nodes.end())
+                ofNotifyEvent(nodeAdded, ne, this);
+        }
 	}
     for (auto it=nodes.begin(); it!=nodes.end();) {
         NodeEntry & node = it->second;
         int age = node.timeStamp - lastPollTime;
         if (age > 4000) {
-            ofNotifyEvent(pollReplyErased, node, this);
-            //it = nodes.erase(it);
-            it++;
+            ofNotifyEvent(nodeErased, node, this);
+            it = nodes.erase(it);
+            //it++;
         } else {
             it++;
         }
@@ -180,6 +184,7 @@ void ofxArtNode::sendPoll() {
 	createPoll();
 	sendMultiCast();
     lastPollTime = ofGetSystemTime();
+    pollFrameNum = ofGetFrameNum();
 }
 
 void ofxArtNode::sendDmx(ArtDmx * dmx) {
@@ -227,6 +232,9 @@ bool ofxArtNode::sendUniCast(int net, int subnet, int universe) {
 }
 
 bool ofxArtNode::sendUniCast(string addr, unsigned short udpPort, char * data, int length) {
+    if (ofGetFrameNum() == pollFrameNum)
+        return false;
+    
     if (!udp.Connect(addr.c_str(), udpPort))
 		return false;
 
