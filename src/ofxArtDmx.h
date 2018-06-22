@@ -7,15 +7,6 @@
 class ofxArtDmx : public ArtDmx {
 public:
 	ofxArtDmx() {
-		ArtNode::setPacketHeader((unsigned char*)this);
-		this->OpCode = OpDmx;
-		this->ProtVerHi = 0;
-		this->ProtVerLo = ProtocolVersion;
-		this->Sequence = 0;
-		this->Physical = 0;
-		this->Net = 0;
-		this->SubUni = 0;
-		this->Length = 512;
 	}
 
 	typedef struct {
