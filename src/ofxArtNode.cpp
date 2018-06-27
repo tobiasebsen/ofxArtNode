@@ -2,6 +2,7 @@
 
 #ifdef WIN32
 #include <iphlpapi.h>
+#include <codecvt>
 #else
 #include <ifaddrs.h>
 #endif
@@ -52,27 +53,34 @@ void ofxArtNode::setup(string host, string mask) {
 map<string,string> ofxArtNode::getInterfaces() {
     map<string,string> interfaces;
 #ifdef WIN32
-	PIP_ADAPTER_INFO pAdapterInfo;
-	ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
-	pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+	ULONG ulOutBufLen = 15*1024;
+	PIP_ADAPTER_ADDRESSES pAddresses = (PIP_ADAPTER_ADDRESSES)HeapAlloc(GetProcessHeap(), 0, ulOutBufLen);
 
-	if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
-		free(pAdapterInfo);
-		pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
-	}
+	DWORD dwRetVal = GetAdaptersAddresses(AF_INET, 0, NULL, pAddresses, &ulOutBufLen);
+	if (dwRetVal == NO_ERROR) {
+		PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
+		while (pCurrAddresses) {
+			wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+			wstring wname = pCurrAddresses->FriendlyName;
+			string name = converter.to_bytes(wname);
+			string address;
 
-	DWORD dwRetVal = 0;
-	if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR) {
-		PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
-		while (pAdapter) {
-			string name = pAdapter->AdapterName;
-			string host = pAdapter->IpAddressList.IpAddress.String;
-			interfaces[name] = host;
-			pAdapter = pAdapter->Next;
+			IP_ADAPTER_UNICAST_ADDRESS *pUniAddr = pCurrAddresses->FirstUnicastAddress;
+			while (pUniAddr) {
+				CHAR addrStr[32];
+				DWORD addrStrLen = sizeof(addrStr);
+				INT iRet = WSAAddressToStringA(pUniAddr->Address.lpSockaddr, pUniAddr->Address.iSockaddrLength, NULL, addrStr, &addrStrLen);
+				if (iRet != SOCKET_ERROR) {
+					address = addrStr;
+					break;
+				}
+				pUniAddr = pUniAddr->Next;
+			}
+			interfaces[name] = address;
+			pCurrAddresses = pCurrAddresses->Next;
 		}
 	}
-	
-	free(pAdapterInfo);
+	HeapFree(GetProcessHeap(), 0, pAddresses);
 #else
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) == -1) {
