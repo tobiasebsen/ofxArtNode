@@ -2,6 +2,7 @@
 
 #ifdef WIN32
 #include <iphlpapi.h>
+#include <codecvt>
 #else
 #include <ifaddrs.h>
 #endif
@@ -21,6 +22,7 @@ void ofxArtNode::setup(string host, string mask) {
         config->ip[3] = 255;
     }
 
+<<<<<<< HEAD
     addr = ofSplitString(mask, ".");
     if (addr.size() == 4) {
         for (int i=0; i<4; i++) {
@@ -33,6 +35,20 @@ void ofxArtNode::setup(string host, string mask) {
         config->mask[2] = 0;
         config->mask[3] = 0;
     }
+=======
+	vector<string> msk = ofSplitString(mask, ".");
+	if (msk.size() == 4) {
+		for (int i=0; i<4; i++) {
+			config->mask[i] = ofToInt(msk[i]);
+		}
+	}
+	else {
+		config->mask[0] = 255;
+		config->mask[1] = 0;
+		config->mask[2] = 0;
+		config->mask[3] = 0;
+	}
+>>>>>>> 153c9ac39754a5c76a54f9e07cd2d059299b65f1
 
 	config->udpPort = DefaultPort;
 
@@ -52,27 +68,34 @@ void ofxArtNode::setup(string host, string mask) {
 map<string,string> ofxArtNode::getInterfaces() {
     map<string,string> interfaces;
 #ifdef WIN32
-	PIP_ADAPTER_INFO pAdapterInfo;
-	ULONG ulOutBufLen = sizeof(IP_ADAPTER_INFO);
-	pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
+	ULONG ulOutBufLen = 15*1024;
+	PIP_ADAPTER_ADDRESSES pAddresses = (PIP_ADAPTER_ADDRESSES)HeapAlloc(GetProcessHeap(), 0, ulOutBufLen);
 
-	if (GetAdaptersInfo(pAdapterInfo, &ulOutBufLen) == ERROR_BUFFER_OVERFLOW) {
-		free(pAdapterInfo);
-		pAdapterInfo = (IP_ADAPTER_INFO *) malloc(ulOutBufLen);
-	}
+	DWORD dwRetVal = GetAdaptersAddresses(AF_INET, 0, NULL, pAddresses, &ulOutBufLen);
+	if (dwRetVal == NO_ERROR) {
+		PIP_ADAPTER_ADDRESSES pCurrAddresses = pAddresses;
+		while (pCurrAddresses) {
+			wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+			wstring wname = pCurrAddresses->FriendlyName;
+			string name = converter.to_bytes(wname);
+			string address;
 
-	DWORD dwRetVal = 0;
-	if ((dwRetVal = GetAdaptersInfo(pAdapterInfo, &ulOutBufLen)) == NO_ERROR) {
-		PIP_ADAPTER_INFO pAdapter = pAdapterInfo;
-		while (pAdapter) {
-			string name = pAdapter->AdapterName;
-			string host = pAdapter->IpAddressList.IpAddress.String;
-			interfaces[name] = host;
-			pAdapter = pAdapter->Next;
+			IP_ADAPTER_UNICAST_ADDRESS *pUniAddr = pCurrAddresses->FirstUnicastAddress;
+			while (pUniAddr) {
+				CHAR addrStr[32];
+				DWORD addrStrLen = sizeof(addrStr);
+				INT iRet = WSAAddressToStringA(pUniAddr->Address.lpSockaddr, pUniAddr->Address.iSockaddrLength, NULL, addrStr, &addrStrLen);
+				if (iRet != SOCKET_ERROR) {
+					address = addrStr;
+					break;
+				}
+				pUniAddr = pUniAddr->Next;
+			}
+			interfaces[name] = address;
+			pCurrAddresses = pCurrAddresses->Next;
 		}
 	}
-	
-	free(pAdapterInfo);
+	HeapFree(GetProcessHeap(), 0, pAddresses);
 #else
     struct ifaddrs *ifaddr, *ifa;
     if (getifaddrs(&ifaddr) == -1) {
@@ -197,6 +220,7 @@ void ofxArtNode::sendPoll() {
 }
 
 void ofxArtNode::sendDmx(ArtDmx * dmx) {
+	setPacketHeader((unsigned char*)dmx);
     bool nodeFound = sendUniCast(dmx->getNet(), dmx->getSub(), dmx->getUni(), (char*)dmx, dmx->getSize());
     //sendMultiCast((char*)dmx, sizeof(ArtDmx));
 }
