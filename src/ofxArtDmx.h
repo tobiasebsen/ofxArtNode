@@ -15,7 +15,7 @@ public:
 		this->Physical = 0;
 		this->Net = 0;
 		this->SubUni = 0;
-		this->Length = 512;
+        setLength(512);
 	}
 
 	typedef struct {
@@ -24,7 +24,13 @@ public:
 		uint8_t b;
 	} RGB;
 
-	typedef struct {
+    typedef struct {
+        uint8_t g;
+        uint8_t r;
+        uint8_t b;
+    } GRB;
+
+    typedef struct {
 		uint8_t r;
 		uint8_t g;
 		uint8_t b;
@@ -38,6 +44,15 @@ public:
 	RGBW * getDataRgbw() {
 		return (RGBW*)Data;
 	}
+    
+    void set(GRB * from, uint16_t count) {
+        RGB * to = getDataRgb();
+        for (int i=0; i<count; i++) {
+            to[i].r = from[i].r;
+            to[i].g = from[i].g;
+            to[i].b = from[i].b;
+        }
+    }
 
 	void set(uint8_t v) {
 		memset(Data, v, sizeof(Data));

@@ -11,7 +11,7 @@ public:
     static string getInterfaceAddr(string name);
 	static string getInterfaceAddr(int ifindex);
 
-    void setup(string host = "2.255.255.255");
+    void setup(string host = "2.255.255.255", string mask = "255.0.0.0");
 
 	void update();
 

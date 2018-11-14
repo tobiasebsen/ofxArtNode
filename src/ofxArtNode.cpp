@@ -6,7 +6,7 @@
 #include <ifaddrs.h>
 #endif
 
-void ofxArtNode::setup(string host) {
+void ofxArtNode::setup(string host, string mask) {
     
     vector<string> addr = ofSplitString(host, ".");
     if (addr.size() == 4) {
@@ -21,10 +21,18 @@ void ofxArtNode::setup(string host) {
         config->ip[3] = 255;
     }
 
-	config->mask[0] = 255;
-	config->mask[1] = 0;
-	config->mask[2] = 0;
-	config->mask[3] = 0;
+    addr = ofSplitString(mask, ".");
+    if (addr.size() == 4) {
+        for (int i=0; i<4; i++) {
+            config->mask[i] = ofToInt(addr[i]);
+        }
+    }
+    else {
+        config->mask[0] = 255;
+        config->mask[1] = 0;
+        config->mask[2] = 0;
+        config->mask[3] = 0;
+    }
 
 	config->udpPort = DefaultPort;
 
@@ -120,11 +128,12 @@ void ofxArtNode::update() {
             ne.address = addr;
             ne.timeStamp = now;
             ne.pollReply = *reply;
-			nodes[addr] = ne;
             ofNotifyEvent(pollReplyReceived, ne, this);
 
             if (nodes.find(addr) == nodes.end())
                 ofNotifyEvent(nodeAdded, ne, this);
+
+            nodes[addr] = ne;
         }
 	}
     for (auto it=nodes.begin(); it!=nodes.end();) {
