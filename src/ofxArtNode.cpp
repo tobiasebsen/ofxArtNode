@@ -22,20 +22,6 @@ void ofxArtNode::setup(string host, string mask) {
         config->ip[3] = 255;
     }
 
-<<<<<<< HEAD
-    addr = ofSplitString(mask, ".");
-    if (addr.size() == 4) {
-        for (int i=0; i<4; i++) {
-            config->mask[i] = ofToInt(addr[i]);
-        }
-    }
-    else {
-        config->mask[0] = 255;
-        config->mask[1] = 0;
-        config->mask[2] = 0;
-        config->mask[3] = 0;
-    }
-=======
 	vector<string> msk = ofSplitString(mask, ".");
 	if (msk.size() == 4) {
 		for (int i=0; i<4; i++) {
@@ -48,7 +34,6 @@ void ofxArtNode::setup(string host, string mask) {
 		config->mask[2] = 0;
 		config->mask[3] = 0;
 	}
->>>>>>> 153c9ac39754a5c76a54f9e07cd2d059299b65f1
 
 	config->udpPort = DefaultPort;
 
